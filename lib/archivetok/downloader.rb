@@ -12,13 +12,18 @@ module Archivetok
     MAX_REDIRECTS = 5
 
     def initialize(config)
-      @output_dir   = config.output_dir
-      @json_sidecar = config.json_sidecar
+      @output_dir        = config.output_dir
+      @json_sidecar      = config.json_sidecar
+      @filename_username = config.filename_username
+      @filename_date     = config.filename_date
+      @filename_id       = config.filename_id
+      @filename_slug     = config.filename_slug
       FileUtils.mkdir_p(@output_dir)
     end
 
     def save_video(data, source_url)
-      filename = build_filename(data[:author_id], data[:create_time], data[:video_id], "mp4")
+      filename = build_filename(data[:author_id], data[:create_time], data[:video_id], "mp4",
+                                description: data[:description])
       path     = File.join(@output_dir, filename)
       puts "  Downloading video...".white
       write_binary(data[:video_url], path, source_url, cookies: data[:cookies])
@@ -28,23 +33,49 @@ module Archivetok
 
     def save_images(data, image_urls, source_url)
       image_urls.each_with_index do |img_url, i|
-        filename = build_filename(data[:author_id], data[:create_time], data[:media_id], "jpg", index: i + 1)
+        filename = build_filename(data[:author_id], data[:create_time], data[:media_id], "jpg",
+                                  index: i + 1, description: data[:description])
         path     = File.join(@output_dir, filename)
         puts "  Downloading image #{i + 1}/#{image_urls.size}...".white
         write_binary(img_url, path, source_url, cookies: data[:cookies])
         puts "  Saved: #{filename}".green
       end
-      sidecar_base = File.join(@output_dir, "#{data[:author_id]}-#{format_date(data[:create_time])}-#{data[:media_id]}")
+      sidecar_base = File.join(@output_dir, build_filename(data[:author_id], data[:create_time],
+                                                           data[:media_id], "sidecar",
+                                                           description: data[:description])
+                                                .sub(/\.sidecar\z/, ""))
       write_sidecar(sidecar_base, data, source_url)
     end
 
     private
 
-    def build_filename(author_id, timestamp, media_id, ext, index: nil)
-      date  = format_date(timestamp)
-      parts = [author_id, date, media_id]
+    def build_filename(author_id, timestamp, media_id, ext, index: nil, description: nil)
+      parts = []
+      parts << author_id                                        if @filename_username
+      parts << format_date(timestamp)                          if @filename_date
+      parts << ((description && slugify(description)) || nil)  if @filename_slug
+      parts << media_id                                        if @filename_id
+      parts.compact!
+      parts << media_id if parts.empty?  # always need something
       parts << index.to_s.rjust(2, "0") if index
       "#{parts.join('-')}.#{ext}"
+    end
+
+    def slugify(text, max_words: 8, min_sentence_words: 5)
+      return nil if text.nil? || text.strip.empty?
+
+      # Try first sentence — use it if it lands in the sweet spot (5+ words)
+      if (m = text.match(/\A(.+?)[.!?](?:\s|$)/))
+        sentence_words = m[1].downcase.gsub(/[''']/, "").gsub(/[^a-z0-9]+/, " ").strip.split
+        if sentence_words.length >= min_sentence_words
+          return sentence_words.first(max_words).join("-")
+        end
+      end
+
+      # Fall back to first max_words words of full text
+      words = text.downcase.gsub(/[''']/, "").gsub(/[^a-z0-9]+/, " ").strip.split
+      slug  = words.first(max_words).join("-")
+      slug.empty? ? nil : slug
     end
 
     def format_date(unix_ts)

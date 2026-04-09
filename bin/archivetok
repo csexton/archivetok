@@ -10,20 +10,26 @@ USAGE = <<~USAGE
   Usage: archivetok URL [URL...] [options]
 
   Options:
-      --output-dir DIR    Directory to save files (default: current directory)
-      --json              Save sidecar as JSON instead of plain text
-      --pages N           Number of pages to fetch for profile listing (default: 1)
-      -h, --help          Show this help message
+      --output-dir DIR        Directory to save files (default: current directory)
+      --json                  Save sidecar as JSON instead of plain text
+      --pages N               Number of pages to fetch for profile listing (default: 1)
+      --[no-]username         Include username in filename (default: on)
+      --[no-]date             Include date in filename (default: on)
+      --[no-]id               Include video ID in filename (default: off)
+      --[no-]slug             Include description slug in filename (default: on)
+      -h, --help              Show this help message
 
   Config file:
       ./.archivetok.yml or ~/.archivetok.yml
-      Supported keys: output_dir, json_sidecar, pages
+      Supported keys: output_dir, json_sidecar, pages,
+                      filename_username, filename_date, filename_id, filename_slug
 
   Examples:
       archivetok https://www.tiktok.com/@user/video/123456
       archivetok --output-dir ~/Downloads/tiktok https://vm.tiktok.com/abc123/
       archivetok https://www.tiktok.com/@user          # list videos
       archivetok --pages 3 https://www.tiktok.com/@user
+      archivetok --no-username --no-date https://...   # slug only
 USAGE
 
 options = {}
@@ -32,6 +38,10 @@ parser = OptionParser.new do |opts|
   opts.on("--output-dir DIR", "Directory to save files") { |d| options[:output_dir] = d }
   opts.on("--json", "Save sidecar as JSON instead of plain text") { options[:json_sidecar] = true }
   opts.on("--pages N", Integer, "Pages to fetch for profile listing") { |n| options[:pages] = n }
+  opts.on("--[no-]username") { |v| options[:filename_username] = v }
+  opts.on("--[no-]date")     { |v| options[:filename_date]     = v }
+  opts.on("--[no-]id")       { |v| options[:filename_id]       = v }
+  opts.on("--[no-]slug")     { |v| options[:filename_slug]     = v }
   opts.on("-h", "--help") { puts USAGE; exit }
 end
 
